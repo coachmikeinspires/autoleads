@@ -1,0 +1,195 @@
+// Prisma schema for AutoLeads
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator typegraphql {
+  provider = "prisma-client-js"
+}
+
+model Org {
+  id                      String   @id @default(uuid())
+  name                    String
+  stripeCustomerId        String?  @map("stripe_customer_id")
+  stripeSubscriptionId    String?  @map("stripe_subscription_id")
+  plan                    String   @default("starter")
+  planStatus              String   @default("trialing") @map("plan_status")
+  createdAt               DateTime @default(now()) @map("created_at")
+  users                   User[]
+  verticals               Vertical[]
+  leads                   Lead[]
+  syncRuns                SyncRun[]
+  crmConnections          CrmConnection[]
+  emailSequences          EmailSequence[]
+}
+
+model User {
+  id            String   @id @default(uuid())
+  org           Org      @relation(fields: [orgId], references: [id])
+  orgId         String   @map("org_id")
+  name          String?
+  email         String   @unique
+  role          String   @default("member")
+  password      String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Vertical {
+  id          String   @id @default(uuid())
+  org         Org      @relation(fields: [orgId], references: [id])
+  orgId       String   @map("org_id")
+  label       String
+  keywordTags Json? @default("[]") @map("keyword_tags")
+  personTitles Json? @default("[]") @map("person_titles")
+  qKeywords   String?  @map("q_keywords")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+  leads       Lead[]
+  syncRuns    SyncRun[]
+}
+
+model Lead {
+  id             String   @id @default(uuid())
+  org            Org      @relation(fields: [orgId], references: [id])
+  orgId          String   @map("org_id")
+  vertical       Vertical? @relation(fields: [verticalId], references: [id])
+  verticalId     String?  @map("vertical_id")
+  firstName      String?  @map("first_name")
+  lastName       String?  @map("last_name")
+  email          String?
+  phone          String?
+  title          String?
+  companyName    String?  @map("company_name")
+  companySize    String?  @map("company_size")
+  location       String?
+  linkedinUrl    String?  @map("linkedin_url")
+  providerId     String?  @map("provider_id")
+  providerSource String?  @map("provider_source")
+  status         String   @default("new")
+  notes          String?
+  crmSyncedAt    DateTime? @map("crm_synced_at")
+  crmRecordId    String?  @map("crm_record_id")
+  crmProvider    String?  @map("crm_provider")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @map("updated_at")
+  enrollments    SequenceEnrollment[]
+}
+
+model SyncRun {
+  id            String   @id @default(uuid())
+  org           Org      @relation(fields: [orgId], references: [id])
+  orgId         String   @map("org_id")
+  vertical      Vertical? @relation(fields: [verticalId], references: [id])
+  verticalId    String?  @map("vertical_id")
+  requestedCount Int     @default(0) @map("requested_count")
+  insertedCount  Int     @default(0) @map("inserted_count")
+  skippedCount   Int     @default(0) @map("skipped_count")
+  status         String  @default("running")
+  errorMessage   String? @map("error_message")
+  startedAt      DateTime? @map("started_at")
+  completedAt    DateTime? @map("completed_at")
+}
+
+model CrmConnection {
+  id                   String   @id @default(uuid())
+  org                  Org      @relation(fields: [orgId], references: [id])
+  orgId                String   @map("org_id")
+  provider             String
+  accessTokenEncrypted String   @map("access_token_encrypted")
+  refreshTokenEncrypted String? @map("refresh_token_encrypted")
+  tokenExpiresAt       DateTime? @map("token_expires_at")
+  connectedAt          DateTime? @map("connected_at")
+  fieldMappings        Json?    @map("field_mappings")
+}
+
+model EmailSequence {
+  id         String   @id @default(uuid())
+  org        Org      @relation(fields: [orgId], references: [id])
+  orgId      String   @map("org_id")
+  name       String
+  status     String   @default("draft")
+  createdAt  DateTime @default(now()) @map("created_at")
+  steps      SequenceStep[]
+  enrollments SequenceEnrollment[]
+}
+
+model SequenceStep {
+  id         String   @id @default(uuid())
+  sequence   EmailSequence @relation(fields: [sequenceId], references: [id])
+  sequenceId String   @map("sequence_id")
+  stepNumber Int      @map("step_number")
+  subject    String?
+  body       String?
+  delayDays  Int      @default(0) @map("delay_days")
+  sends      EmailSend[]
+}
+
+model SequenceEnrollment {
+  id          String   @id @default(uuid())
+  lead        Lead     @relation(fields: [leadId], references: [id])
+  leadId      String   @map("lead_id")
+  sequence    EmailSequence @relation(fields: [sequenceId], references: [id])
+  sequenceId  String   @map("sequence_id")
+  currentStep Int      @default(0) @map("current_step")
+  status      String   @default("active")
+  enrolledAt  DateTime @default(now()) @map("enrolled_at")
+  sends       EmailSend[]
+}
+
+model EmailSend {
+  id            String   @id @default(uuid())
+  enrollment    SequenceEnrollment @relation(fields: [enrollmentId], references: [id])
+  enrollmentId  String   @map("enrollment_id")
+  step          SequenceStep @relation(fields: [stepId], references: [id])
+  stepId        String   @map("step_id")
+  sentAt        DateTime? @map("sent_at")
+  openedAt      DateTime? @map("opened_at")
+  clickedAt     DateTime? @map("clicked_at")
+  repliedAt     DateTime? @map("replied_at")
+  bouncedAt     DateTime? @map("bounced_at")
+}
+
+/// NextAuth models
+model Account {
+  id                 String  @id @default(cuid())
+  user               User    @relation(fields: [userId], references: [id])
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @map("refresh_token")
+  access_token       String?  @map("access_token")
+  expires_at         Int?     @map("expires_at")
+  token_type         String?  @map("token_type")
+  scope              String?
+  id_token           String?  @map("id_token")
+  session_state      String?  @map("session_state")
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String   @map("user_id")
+  expires      DateTime
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
