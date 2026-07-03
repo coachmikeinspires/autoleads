@@ -3,9 +3,14 @@ import { getAuthSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-08-01' });
-
 export async function POST(request: Request) {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    return NextResponse.json({ error: 'Stripe is not configured' }, { status: 500 });
+  }
+
+  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-06-24.dahlia' });
+
   const session = await getAuthSession();
   if (!session?.user?.orgId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const body = await request.json();
