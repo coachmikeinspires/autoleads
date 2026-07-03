@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 
@@ -68,7 +68,7 @@ export default function SequenceDetailPage(){
     return "status-draft";
   };
 
-  async function load(){
+  const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -95,9 +95,11 @@ export default function SequenceDetailPage(){
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [id]);
 
-  useEffect(()=>{ void load(); },[id]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const availableLeads = leads.filter((lead) => !enrollments.some((enrollment) => enrollment.lead.id === lead.id));
 

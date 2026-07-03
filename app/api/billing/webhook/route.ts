@@ -14,26 +14,35 @@ export async function POST(request: Request) {
 
   const sig = request.headers.get('stripe-signature') || '';
   const buf = await request.text();
-  let event;
+  let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(Buffer.from(buf), sig, webhookSecret);
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
   // Handle subscription.updated / checkout.session.completed
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object as any;
+    const session = event.data.object as Stripe.Checkout.Session;
     const orgId = session.metadata?.orgId;
     if (orgId) {
-      await prisma.org.updateMany({ where: { id: orgId }, data: { stripeCustomerId: session.customer, stripeSubscriptionId: session.subscription, planStatus: 'active' } });
+      const stripeCustomerId = typeof session.customer === 'string' ? session.customer : session.customer?.id ?? null;
+      const stripeSubscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id ?? null;
+
+      await prisma.org.updateMany({
+        where: { id: orgId },
+        data: { stripeCustomerId, stripeSubscriptionId, planStatus: 'active' },
+      });
     }
   }
 
   if (event.type === 'invoice.payment_failed') {
-    const inv = event.data.object as any;
-    const subId = inv.subscription;
-    await prisma.org.updateMany({ where: { stripeSubscriptionId: subId }, data: { planStatus: 'past_due' } });
+    const inv = event.data.object as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null };
+    const subId = typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id ?? null;
+
+    if (subId) {
+      await prisma.org.updateMany({ where: { stripeSubscriptionId: subId }, data: { planStatus: 'past_due' } });
+    }
   }
 
   return NextResponse.json({ received: true });

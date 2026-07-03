@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getAuthSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
 
 export async function POST(request: Request) {
