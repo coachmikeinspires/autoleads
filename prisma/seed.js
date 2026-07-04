@@ -2,7 +2,7 @@ require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const { hash } = require('bcryptjs');
 
-const prisma = new PrismaClient({ adapter: { provider: 'sqlite', url: process.env.DATABASE_URL } });
+const prisma = new PrismaClient();
 
 async function main() {
   const org = await prisma.org.create({ data: { name: 'Example Org', plan: 'starter', planStatus: 'active' } });
