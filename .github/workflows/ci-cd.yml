@@ -92,6 +92,8 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      WORKER_RESTART_URL: ${{ secrets.WORKER_RESTART_URL }}
     
     steps:
       - uses: actions/checkout@v3
@@ -114,10 +116,10 @@ jobs:
           vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
 
       - name: Run database migrations
-        run: npx prisma migrate deploy --skip-generate
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        if: env.DATABASE_URL != ''
+        run: npx prisma migrate deploy
 
       - name: Restart worker
+        if: env.WORKER_RESTART_URL != ''
         run: |
-          curl -X POST ${{ secrets.WORKER_RESTART_URL }}
+          curl -X POST "$WORKER_RESTART_URL"
