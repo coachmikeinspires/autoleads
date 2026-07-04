@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AutoLeads
 
-## Getting Started
+AutoLeads is a B2B SaaS lead generation and outreach dashboard built with Next.js, NextAuth, Prisma, and Vercel. It includes lead management, email sequence workflows, sync runs, CRM connection surfaces, billing hooks, and a production deployment path backed by Neon Postgres.
 
-First, run the development server:
+## Local Development
+
+Install dependencies and start the app:
+
+```bash
+npm install
+PORT=3001 npm run dev
+```
+
+The local sign-in page is available at `http://localhost:3001/auth/signin`.
+
+Default seeded credentials:
+
+```text
+Email: admin@example.com
+Password: password123
+```
+
+## Core Scripts
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm run lint
+npm run type-check
+npm run test -- --coverage
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`npm run build` regenerates Prisma before compiling so deploys do not ship a stale client.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Production Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Frontend/runtime: Next.js on Vercel
+- Auth: NextAuth credentials provider with JWT sessions
+- Database: Neon Postgres connected through the Vercel Marketplace integration
+- ORM: Prisma
+- CI/CD: GitHub Actions in `.github/workflows/ci-cd.yml`
 
-## Learn More
+## Required Production Environment Variables
 
-To learn more about Next.js, take a look at the following resources:
+Vercel-managed Neon variables:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```text
+DATABASE_URL
+DATABASE_URL_UNPOOLED
+POSTGRES_PRISMA_URL
+PGHOST
+PGHOST_UNPOOLED
+PGUSER
+PGPASSWORD
+PGDATABASE
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Application variables:
 
-## Deploy on Vercel
+```text
+NEXTAUTH_URL
+NEXTAUTH_SECRET
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Optional integrations:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+SMTP_HOST
+SMTP_PORT
+SMTP_USER
+SMTP_PASS
+HUBSPOT_CLIENT_ID
+HUBSPOT_CLIENT_SECRET
+HUBSPOT_REDIRECT_URI
+WORKER_RESTART_URL
+```
+
+## Deployment Notes
+
+- Production deploys are handled by GitHub Actions and Vercel.
+- Post-deploy migrations run in CI against the GitHub secrets `DATABASE_URL` and `DATABASE_URL_UNPOOLED`.
+- Manual Vercel deploys ignore local env and SQLite artifacts via `.vercelignore`.
+
+## References
+
+- Deployment details: `docs/DEPLOYMENT.md`
+- API surface: `docs/API_REFERENCE.md`
+- Testing notes: `docs/TESTING.md`

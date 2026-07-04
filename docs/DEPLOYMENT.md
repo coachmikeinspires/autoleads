@@ -1,5 +1,12 @@
 # AutoLeads Deployment Guide
 
+## Current Production Topology
+
+- Hosting: Vercel
+- Database: Neon Postgres provisioned through the Vercel Marketplace integration
+- Auth: NextAuth credentials provider with JWT sessions
+- CI/CD: GitHub Actions workflow in `.github/workflows/ci-cd.yml`
+
 ## Quick Deploy to Vercel
 
 ### 1. Connect GitHub
@@ -11,14 +18,37 @@ git push origin main
 
 Log in to [vercel.com](https://vercel.com) and import the repository.
 
-### 2. Add Environment Variables
+### 2. Provision the Database
+
+Use the Vercel Marketplace integration to create and connect a Neon database:
+
+```bash
+npx vercel integration add neon --plan free_v3 -e production -e preview -m region=iad1 -m auth=false --format=json
+```
+
+This injects the Postgres variables used by production:
+
+```text
+DATABASE_URL
+DATABASE_URL_UNPOOLED
+POSTGRES_PRISMA_URL
+PGHOST
+PGHOST_UNPOOLED
+PGUSER
+PGPASSWORD
+PGDATABASE
+POSTGRES_URL
+POSTGRES_URL_NON_POOLING
+POSTGRES_PRISMA_URL
+```
+
+### 3. Add Application Environment Variables
 
 In Vercel Dashboard → Settings → Environment Variables:
 
 ```
 NEXTAUTH_URL=https://your-domain.vercel.app
 NEXTAUTH_SECRET=<generate-random-secret>
-DATABASE_URL=postgresql://user:pass@host:5432/autoleads
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 SMTP_HOST=smtp.sendgrid.net
@@ -27,9 +57,28 @@ SMTP_USER=apikey
 SMTP_PASS=<your-sendgrid-key>
 HUBSPOT_CLIENT_ID=...
 HUBSPOT_CLIENT_SECRET=...
+HUBSPOT_REDIRECT_URI=...
 ```
 
-### 3. Deploy
+### 4. Configure GitHub Actions Secrets
+
+Repository secrets required by the deployment workflow:
+
+```text
+VERCEL_TOKEN
+VERCEL_ORG_ID
+VERCEL_PROJECT_ID
+DATABASE_URL
+DATABASE_URL_UNPOOLED
+```
+
+Optional:
+
+```text
+WORKER_RESTART_URL
+```
+
+### 5. Deploy
 
 ```bash
 git push origin main
@@ -37,34 +86,38 @@ git push origin main
 
 Vercel auto-deploys. Check dashboard for status.
 
-### 4. Run Migrations
+### 6. Run Migrations
 
-Once deployed, run migrations on the production database:
+The GitHub Actions production job already runs migrations automatically:
 
 ```bash
-npx prisma migrate deploy --skip-generate
-npx prisma generate
+npx prisma migrate deploy
+```
+
+If you need to run them manually against Vercel production envs:
+
+```bash
+npx vercel env pull .env.production.vercel --environment=production --yes
+DATABASE_URL=$(grep '^POSTGRES_PRISMA_URL=' .env.production.vercel | cut -d'=' -f2- | tr -d '"') \
+DATABASE_URL_UNPOOLED=$(grep '^DATABASE_URL_UNPOOLED=' .env.production.vercel | cut -d'=' -f2- | tr -d '"') \
+npx prisma migrate deploy
 ```
 
 ## PostgreSQL Setup
 
-### Option A: AWS RDS
+### Recommended: Neon via Vercel Marketplace
 
-1. Create RDS PostgreSQL instance
-2. Allow inbound from Vercel IPs (or anywhere for now)
-3. Create database: `createdb autoleads`
-4. Add connection string to `.env` (and Vercel):
+This project is now wired for Neon Postgres on Vercel. Prisma expects a PostgreSQL datasource with:
 
+```prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
 ```
-DATABASE_URL=postgresql://admin:password@your-rds.amazonaws.com:5432/autoleads
-```
 
-### Option B: Supabase (Recommended for startups)
-
-1. Sign up at [supabase.com](https://supabase.com)
-2. Create a new project
-3. Copy connection string from Settings → Database
-4. Add to Vercel
+Do not use the previous SQLite-style `file:../dev.db` value in production.
 
 ## Background Worker Deployment
 
@@ -227,7 +280,7 @@ model Lead {
 ### 500 Errors in Production
 
 ```bash
-vercel logs --follow
+npx vercel inspect <deployment-or-domain> --logs
 ```
 
 Check error logs for details.
@@ -247,8 +300,10 @@ For Railway/Render:
 Test connection:
 
 ```bash
-psql $DATABASE_URL
+psql "$DATABASE_URL_UNPOOLED"
 ```
+
+If Prisma migrations fail in CI with a missing `DATABASE_URL_UNPOOLED`, make sure both `DATABASE_URL` and `DATABASE_URL_UNPOOLED` are present in GitHub repository secrets.
 
 ### High Latency
 
