@@ -4,6 +4,26 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import type { NextAuthOptions, Session } from "next-auth";
 
+function getSafeNextAuthUrl() {
+  const raw = process.env.NEXTAUTH_URL?.trim();
+  if (raw) {
+    try {
+      return new URL(raw).toString();
+    } catch {
+      // Ignore invalid values and use fallback below.
+    }
+  }
+
+  const vercelHost = process.env.VERCEL_URL?.trim();
+  if (vercelHost) {
+    return `https://${vercelHost}`;
+  }
+
+  return "http://localhost:3000";
+}
+
+process.env.NEXTAUTH_URL = getSafeNextAuthUrl();
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
